@@ -21,7 +21,7 @@ constexpr auto FileAnnotations = "annotations";
 constexpr auto FileSourceSubstitutions = "srcsub";
 
 enum : uint32_t { VersionTimeline = 0 };
-enum : uint32_t { VersionOptions = 7 };
+enum : uint32_t { VersionOptions = 8 };
 enum : uint32_t { VersionAnnotations = 0 };
 enum : uint32_t { VersionSourceSubstitutions = 0 };
 
@@ -112,6 +112,9 @@ void UserData::LoadState( ViewData& data )
             fread( &data.forceColors, 1, sizeof( data.forceColors ), f );
             fread( &data.ghostZones, 1, sizeof( data.ghostZones ), f );
             fread( &data.frameTarget, 1, sizeof( data.frameTarget ), f );
+            fread(&data.viewPixelHeight, 1, sizeof(data.viewPixelHeight), f);
+            fread(&data.maxFps, 1, sizeof(data.maxFps), f);
+            fread(&data.goodFps, 1, sizeof(data.goodFps), f);
         }
         fclose( f );
     }
@@ -156,6 +159,9 @@ void UserData::SaveState( const ViewData& data )
         fwrite( &data.forceColors, 1, sizeof( data.forceColors ), f );
         fwrite( &data.ghostZones, 1, sizeof( data.ghostZones ), f );
         fwrite( &data.frameTarget, 1, sizeof( data.frameTarget ), f );
+        fwrite( &data.viewPixelHeight, 1, sizeof(data.viewPixelHeight), f);
+        fwrite( &data.maxFps, 1, sizeof(data.maxFps), f);
+        fwrite( &data.goodFps, 1, sizeof(data.goodFps), f);
         fclose( f );
     }
 }

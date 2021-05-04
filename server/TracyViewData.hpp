@@ -40,10 +40,6 @@ struct ViewData
     int32_t frameScale = 0;
     int32_t frameStart = 0;
 
-    int32_t viewPixelHeight = 100;
-    int32_t maxFps = 15;
-    int32_t goodFps = 60;
-
     uint8_t drawGpuZones = true;
     uint8_t drawZones = true;
     uint8_t drawLocks = true;
@@ -61,6 +57,9 @@ struct ViewData
     uint8_t ghostZones = true;
 
     uint32_t frameTarget = 60;
+    int32_t viewPixelHeight = 100;
+    int32_t maxFps = 15;
+    int32_t goodFps = 60;
 };
 
 struct Annotation
