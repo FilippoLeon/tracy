@@ -1686,7 +1686,7 @@ void View::DrawFrames()
     const int onScreen = ( w - 2 ) / fwidth;
     if( m_viewMode != ViewMode::Paused )
     {
-        m_vd.frameStart = ( total < onScreen * group ) ? 0 : total - onScreen * group;
+        m_vd.frameStart = total - onScreen * group;
         if( m_viewMode == ViewMode::LastFrames )
         {
             SetViewToLastFrames();
@@ -1713,7 +1713,7 @@ void View::DrawFrames()
             if( abs( delta ) >= fwidth )
             {
                 const auto d = (int)delta / fwidth;
-                m_vd.frameStart = std::max( 0, m_vd.frameStart - d * group );
+                m_vd.frameStart = m_vd.frameStart - d * group;
                 io.MouseClickedPos[1].x = io.MousePos.x + d * fwidth - delta;
             }
         }
@@ -1725,7 +1725,7 @@ void View::DrawFrames()
             const auto off = mo * group / fwidth;
 
             const int sel = m_vd.frameStart + off;
-            if( sel < total )
+            if( sel >= 0 && sel < total )
             {
                 ImGui::BeginTooltip();
                 if( group > 1 )
@@ -1861,7 +1861,7 @@ void View::DrawFrames()
                 const int pgroup = GetFrameGroup( prevScale );
 
                 const auto oldoff = mo * pgroup / pfwidth;
-                m_vd.frameStart = std::min( total, std::max( 0, m_vd.frameStart - int( off - oldoff ) ) );
+                m_vd.frameStart = std::min( total, m_vd.frameStart - int( off - oldoff ) );
             }
         }
     }
@@ -1874,128 +1874,130 @@ void View::DrawFrames()
         auto begin = zoneData.zones.begin();
         while( i < onScreen && m_vd.frameStart + idx < total )
         {
-            const auto f0 = m_worker.GetFrameBegin( *m_frames, m_vd.frameStart + idx );
-            auto f1 = m_worker.GetFrameEnd( *m_frames, m_vd.frameStart + idx );
-            auto f = f1 - f0;
-            if( group > 1 )
-            {
-                const int g = std::min( group, total - ( m_vd.frameStart + idx ) );
-                for( int j=1; j<g; j++ )
+            if (m_vd.frameStart + idx >= 0) {
+                const auto f0 = m_worker.GetFrameBegin( *m_frames, m_vd.frameStart + idx );
+                auto f1 = m_worker.GetFrameEnd( *m_frames, m_vd.frameStart + idx );
+                auto f = f1 - f0;
+                if( group > 1 )
                 {
-                    f = std::max( f, m_worker.GetFrameTime( *m_frames, m_vd.frameStart + idx + j ) );
+                    const int g = std::min( group, total - ( m_vd.frameStart + idx ) );
+                    for( int j=1; j<g; j++ )
+                    {
+                        f = std::max( f, m_worker.GetFrameTime( *m_frames, m_vd.frameStart + idx + j ) );
+                    }
+                    f1 = m_worker.GetFrameEnd( *m_frames, m_vd.frameStart + idx + g - 1 );
                 }
-                f1 = m_worker.GetFrameEnd( *m_frames, m_vd.frameStart + idx + g - 1 );
-            }
 
-            int64_t zoneTime = 0;
-            // This search is not valid, as zones are sorted according to their start time, not end time.
-            auto itStart = std::lower_bound( begin, zoneData.zones.end(), f0, [] ( const auto& l, const auto& r ) { return l.Zone()->End() < r; } );
-            if( itStart != zoneData.zones.end() )
-            {
-                auto itEnd = std::lower_bound( itStart, zoneData.zones.end(), f1, [] ( const auto& l, const auto& r ) { return l.Zone()->Start() < r; } );
-                if( m_frames->continuous )
+                int64_t zoneTime = 0;
+                // This search is not valid, as zones are sorted according to their start time, not end time.
+                auto itStart = std::lower_bound( begin, zoneData.zones.end(), f0, [] ( const auto& l, const auto& r ) { return l.Zone()->End() < r; } );
+                if( itStart != zoneData.zones.end() )
                 {
-                    if( m_findZone.selfTime )
+                    auto itEnd = std::lower_bound( itStart, zoneData.zones.end(), f1, [] ( const auto& l, const auto& r ) { return l.Zone()->Start() < r; } );
+                    if( m_frames->continuous )
                     {
-                        while( itStart != itEnd )
+                        if( m_findZone.selfTime )
                         {
-                            const auto t0 = clamp( itStart->Zone()->Start(), f0, f1 );
-                            const auto t1 = clamp( m_worker.GetZoneEndDirect( *itStart->Zone() ), f0, f1 );
-                            zoneTime += t1 - t0 - GetZoneChildTimeFastClamped( *itStart->Zone(), t0, t1 );
-                            itStart++;
-                        }
-                    }
-                    else
-                    {
-                        while( itStart != itEnd )
-                        {
-                            const auto t0 = clamp( itStart->Zone()->Start(), f0, f1 );
-                            const auto t1 = clamp( m_worker.GetZoneEndDirect( *itStart->Zone() ), f0, f1 );
-                            zoneTime += t1 - t0;
-                            itStart++;
-                        }
-                    }
-                }
-                else
-                {
-                    if( m_findZone.selfTime )
-                    {
-                        while( itStart != itEnd )
-                        {
-                            const int g = std::min( group, total - ( m_vd.frameStart + idx ) );
-                            for( int j=0; j<g; j++ )
+                            while( itStart != itEnd )
                             {
-                                const auto ft0 = m_worker.GetFrameBegin( *m_frames, m_vd.frameStart + idx + j );
-                                const auto ft1 = m_worker.GetFrameEnd( *m_frames, m_vd.frameStart + idx + j );
-                                const auto t0 = clamp( itStart->Zone()->Start(), ft0, ft1 );
-                                const auto t1 = clamp( m_worker.GetZoneEndDirect( *itStart->Zone() ), ft0, ft1 );
+                                const auto t0 = clamp( itStart->Zone()->Start(), f0, f1 );
+                                const auto t1 = clamp( m_worker.GetZoneEndDirect( *itStart->Zone() ), f0, f1 );
                                 zoneTime += t1 - t0 - GetZoneChildTimeFastClamped( *itStart->Zone(), t0, t1 );
+                                itStart++;
                             }
-                            itStart++;
+                        }
+                        else
+                        {
+                            while( itStart != itEnd )
+                            {
+                                const auto t0 = clamp( itStart->Zone()->Start(), f0, f1 );
+                                const auto t1 = clamp( m_worker.GetZoneEndDirect( *itStart->Zone() ), f0, f1 );
+                                zoneTime += t1 - t0;
+                                itStart++;
+                            }
                         }
                     }
                     else
                     {
-                        while( itStart != itEnd )
+                        if( m_findZone.selfTime )
                         {
-                            const int g = std::min( group, total - ( m_vd.frameStart + idx ) );
-                            for( int j=0; j<g; j++ )
+                            while( itStart != itEnd )
                             {
-                                const auto ft0 = m_worker.GetFrameBegin( *m_frames, m_vd.frameStart + idx + j );
-                                const auto ft1 = m_worker.GetFrameEnd( *m_frames, m_vd.frameStart + idx + j );
-                                const auto t0 = clamp( itStart->Zone()->Start(), ft0, ft1 );
-                                const auto t1 = clamp( m_worker.GetZoneEndDirect( *itStart->Zone() ), ft0, ft1 );
-                                zoneTime += t1 - t0;
+                                const int g = std::min( group, total - ( m_vd.frameStart + idx ) );
+                                for( int j=0; j<g; j++ )
+                                {
+                                    const auto ft0 = m_worker.GetFrameBegin( *m_frames, m_vd.frameStart + idx + j );
+                                    const auto ft1 = m_worker.GetFrameEnd( *m_frames, m_vd.frameStart + idx + j );
+                                    const auto t0 = clamp( itStart->Zone()->Start(), ft0, ft1 );
+                                    const auto t1 = clamp( m_worker.GetZoneEndDirect( *itStart->Zone() ), ft0, ft1 );
+                                    zoneTime += t1 - t0 - GetZoneChildTimeFastClamped( *itStart->Zone(), t0, t1 );
+                                }
+                                itStart++;
                             }
-                            itStart++;
+                        }
+                        else
+                        {
+                            while( itStart != itEnd )
+                            {
+                                const int g = std::min( group, total - ( m_vd.frameStart + idx ) );
+                                for( int j=0; j<g; j++ )
+                                {
+                                    const auto ft0 = m_worker.GetFrameBegin( *m_frames, m_vd.frameStart + idx + j );
+                                    const auto ft1 = m_worker.GetFrameEnd( *m_frames, m_vd.frameStart + idx + j );
+                                    const auto t0 = clamp( itStart->Zone()->Start(), ft0, ft1 );
+                                    const auto t1 = clamp( m_worker.GetZoneEndDirect( *itStart->Zone() ), ft0, ft1 );
+                                    zoneTime += t1 - t0;
+                                }
+                                itStart++;
+                            }
                         }
                     }
                 }
-            }
-            else
-            {
-                begin = itStart;
-            }
+                else
+                {
+                    begin = itStart;
+                }
 
-            zoneTime /= group;
-            const auto h = std::max( 1.f, float( std::min<uint64_t>(maxHeight, f ) ) / maxHeight * ( Height - 2 ) );
-            if( zoneTime == 0 )
-            {
-                if( fwidth != 1 )
+                zoneTime /= group;
+                const auto h = std::max( 1.f, float( std::min<uint64_t>(maxHeight, f ) ) / maxHeight * ( Height - 2 ) );
+                if (zoneTime == 0)
                 {
-                    draw->AddRectFilled( wpos + ImVec2( 1 + i*fwidth, Height-1-h ), wpos + ImVec2( fwidth + i*fwidth, Height-1 ), 0xFF888888 );
+                    if (fwidth != 1)
+                    {
+                        draw->AddRectFilled(wpos + ImVec2(1 + i * fwidth, Height - 1 - h), wpos + ImVec2(fwidth + i * fwidth, Height - 1), 0xFF888888);
+                    }
+                    else
+                    {
+                        DrawLine(draw, dpos + ImVec2(1 + i, Height - 2 - h), dpos + ImVec2(1 + i, Height - 2), 0xFF888888);
+                    }
+                }
+                else if (zoneTime <= f)
+                {
+                    const auto zh = float(std::min<uint64_t>(maxHeight, zoneTime)) / maxHeight * (Height - 2);
+                    if (fwidth != 1)
+                    {
+                        draw->AddRectFilled(wpos + ImVec2(1 + i * fwidth, Height - 1 - h), wpos + ImVec2(fwidth + i * fwidth, Height - 1 - zh), 0xFF888888);
+                        draw->AddRectFilled(wpos + ImVec2(1 + i * fwidth, Height - 1 - zh), wpos + ImVec2(fwidth + i * fwidth, Height - 1), 0xFFEEEEEE);
+                    }
+                    else
+                    {
+                        DrawLine(draw, dpos + ImVec2(1 + i, Height - 2 - h), dpos + ImVec2(1 + i, Height - 2 - zh), 0xFF888888);
+                        DrawLine(draw, dpos + ImVec2(1 + i, Height - 2 - zh), dpos + ImVec2(1 + i, Height - 2), 0xFFEEEEEE);
+                    }
                 }
                 else
                 {
-                    DrawLine( draw, dpos + ImVec2( 1+i, Height-2-h ), dpos + ImVec2( 1+i, Height-2 ), 0xFF888888 );
-                }
-            }
-            else if( zoneTime <= f )
-            {
-                const auto zh = float( std::min<uint64_t>(maxHeight, zoneTime ) ) / maxHeight * ( Height - 2 );
-                if( fwidth != 1 )
-                {
-                    draw->AddRectFilled( wpos + ImVec2( 1 + i*fwidth, Height-1-h ), wpos + ImVec2( fwidth + i*fwidth, Height-1-zh ), 0xFF888888 );
-                    draw->AddRectFilled( wpos + ImVec2( 1 + i*fwidth, Height-1-zh ), wpos + ImVec2( fwidth + i*fwidth, Height-1 ), 0xFFEEEEEE );
-                }
-                else
-                {
-                    DrawLine( draw, dpos + ImVec2( 1+i, Height-2-h ), dpos + ImVec2( 1+i, Height-2-zh ), 0xFF888888 );
-                    DrawLine( draw, dpos + ImVec2( 1+i, Height-2-zh ), dpos + ImVec2( 1+i, Height-2 ), 0xFFEEEEEE );
-                }
-            }
-            else
-            {
-                const auto zh = float( std::min<uint64_t>(maxHeight, zoneTime ) ) / maxHeight * ( Height - 2 );
-                if( fwidth != 1 )
-                {
-                    draw->AddRectFilled( wpos + ImVec2( 1 + i*fwidth, Height-1-zh ), wpos + ImVec2( fwidth + i*fwidth, Height-1-h ), 0xFF2222BB );
-                    draw->AddRectFilled( wpos + ImVec2( 1 + i*fwidth, Height-1-h ), wpos + ImVec2( fwidth + i*fwidth, Height-1 ), 0xFFEEEEEE );
-                }
-                else
-                {
-                    DrawLine( draw, dpos + ImVec2( 1+i, Height-2-zh ), dpos + ImVec2( 1+i, Height-2-h ), 0xFF2222BB );
-                    DrawLine( draw, dpos + ImVec2( 1+i, Height-2-h ), dpos + ImVec2( 1+i, Height-2 ), 0xFFEEEEEE );
+                    const auto zh = float(std::min<uint64_t>(maxHeight, zoneTime)) / maxHeight * (Height - 2);
+                    if (fwidth != 1)
+                    {
+                        draw->AddRectFilled(wpos + ImVec2(1 + i * fwidth, Height - 1 - zh), wpos + ImVec2(fwidth + i * fwidth, Height - 1 - h), 0xFF2222BB);
+                        draw->AddRectFilled(wpos + ImVec2(1 + i * fwidth, Height - 1 - h), wpos + ImVec2(fwidth + i * fwidth, Height - 1), 0xFFEEEEEE);
+                    }
+                    else
+                    {
+                        DrawLine(draw, dpos + ImVec2(1 + i, Height - 2 - zh), dpos + ImVec2(1 + i, Height - 2 - h), 0xFF2222BB);
+                        DrawLine(draw, dpos + ImVec2(1 + i, Height - 2 - h), dpos + ImVec2(1 + i, Height - 2), 0xFFEEEEEE);
+                    }
                 }
             }
 
@@ -2006,26 +2008,30 @@ void View::DrawFrames()
     else
 #endif
     {
+        //i = std::max(m_vd.frameStart, 0);
+        //idx = m_vd.frameStart * group;
         while( i < onScreen && m_vd.frameStart + idx < total )
         {
-            auto f = m_worker.GetFrameTime( *m_frames, m_vd.frameStart + idx );
-            if( group > 1 )
-            {
-                const int g = std::min( group, total - ( m_vd.frameStart + idx ) );
-                for( int j=1; j<g; j++ )
+            if (m_vd.frameStart + idx >= 0) {
+                auto f = m_worker.GetFrameTime(*m_frames, m_vd.frameStart + idx);
+                if (group > 1)
                 {
-                    f = std::max( f, m_worker.GetFrameTime( *m_frames, m_vd.frameStart + idx + j ) );
+                    const int g = std::min(group, total - (m_vd.frameStart + idx));
+                    for (int j = 1; j < g; j++)
+                    {
+                        f = std::max(f, m_worker.GetFrameTime(*m_frames, m_vd.frameStart + idx + j));
+                    }
                 }
-            }
 
-            const auto h = std::max( 1.f, float( std::min<uint64_t>(maxHeight, f ) ) / maxHeight * ( Height - 2 ) );
-            if( fwidth != 1 )
-            {
-                draw->AddRectFilled( wpos + ImVec2( 1 + i*fwidth, Height-1-h ), wpos + ImVec2( fwidth + i*fwidth, Height-1 ), GetFrameColor( m_vd.goodFps, f ) );
-            }
-            else
-            {
-                DrawLine( draw, dpos + ImVec2( 1+i, Height-2-h ), dpos + ImVec2( 1+i, Height-2 ), GetFrameColor( m_vd.goodFps, f ) );
+                const auto h = std::max(1.f, float(std::min<uint64_t>(maxHeight, f)) / maxHeight * (Height - 2));
+                if (fwidth != 1)
+                {
+                    draw->AddRectFilled(wpos + ImVec2(1 + i * fwidth, Height - 1 - h), wpos + ImVec2(fwidth + i * fwidth, Height - 1), GetFrameColor(m_vd.goodFps, f));
+                }
+                else
+                {
+                    DrawLine(draw, dpos + ImVec2(1 + i, Height - 2 - h), dpos + ImVec2(1 + i, Height - 2), GetFrameColor(m_vd.goodFps, f));
+                }
             }
 
             i++;
