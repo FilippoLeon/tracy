@@ -1647,7 +1647,6 @@ void View::DrawFrames()
     auto draw = ImGui::GetWindowDrawList();
 
     const auto Height = m_vd.viewPixelHeight * scale;
-    int maxHeight = 1000 * 1000 * 1000 / m_vd.maxFps;
 
     ImGui::InvisibleButton( "##frames", ImVec2( w, Height ) );
     bool hover = ImGui::IsItemHovered();
@@ -1658,26 +1657,28 @@ void View::DrawFrames()
     const bool ctrlClicked = io.KeyCtrl;
     if( hover )
     {
-        //if (ctrlClicked) {
+        if (ctrlClicked) {
             if (wheel > 0)
             {
-                if (maxHeight >= 100 * 1000 * 1000) maxHeight -= 50 * 1000 * 1000;
+                if (m_vd.maxFps >= 2) m_vd.maxFps /= 2;
             }
             else if (wheel < 0)
             {
-                if (maxHeight >= 1000 * 1000 * 1000) maxHeight += 50 * 1000 * 1000;
+                if (m_vd.maxFps < 240) m_vd.maxFps *= 2;
             }
-        //} else {
-        //    if (wheel > 0)
-        //    {
-        //        if (m_vd.frameScale >= 0) m_vd.frameScale--;
-        //    }
-        //    else if (wheel < 0)
-        //    {
-        //        if (m_vd.frameScale < 10) m_vd.frameScale++;
-        //    }
-        //}
+        } else {
+            if (wheel > 0)
+            {
+                if (m_vd.frameScale >= 0) m_vd.frameScale--;
+            }
+            else if (wheel < 0)
+            {
+                if (m_vd.frameScale < 10) m_vd.frameScale++;
+            }
+        }
     }
+
+    int maxHeight = 1000 * 1000 * 1000 / m_vd.maxFps;
 
     const int fwidth = GetFrameWidth( m_vd.frameScale );
     const int group = GetFrameGroup( m_vd.frameScale );
