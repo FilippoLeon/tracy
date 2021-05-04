@@ -1599,15 +1599,18 @@ bool View::DrawConnection()
     return true;
 }
 
-enum { BestTime = 1000 * 1000 * 1000 / 143 };
-enum { GoodTime = 1000 * 1000 * 1000 / 59 };
-enum { BadTime = 1000 * 1000 * 1000 / 29 };
-
-static ImU32 GetFrameColor( uint64_t frameTime )
+static ImU32 GetFrameColor(uint64_t goodFps, uint64_t frameTime )
 {
-    return frameTime > BadTime  ? 0xFF2222DD :
-           frameTime > GoodTime ? 0xFF22DDDD :
-           frameTime > BestTime ? 0xFF22DD22 : 0xFFDD9900;
+    if (frameTime > 1000 * 1000 * 1000 * 4 / goodFps) {
+        return 0xFF2222DD;
+    }
+    if (frameTime > 1000 * 1000 * 1000 * 2 / goodFps) {
+        return 0xFF22DDDD;
+    }
+    if (frameTime > 1000 * 1000 * 1000 * 1 / goodFps) {
+        return 0xFF22DD22;
+    }
+    return 0xFFDD9900;
 }
 
 static int GetFrameWidth( int frameScale )
@@ -1631,9 +1634,6 @@ void View::DrawFrames()
     assert( m_worker.GetFrameCount( *m_frames ) != 0 );
 
     const auto scale = ImGui::GetTextLineHeight() / 15.f;
-    const auto Height = 50 * scale;
-
-    enum { MaxFrameTime = 50 * 1000 * 1000 };  // 50ms
 
     ImGuiWindow* window = ImGui::GetCurrentWindowRead();
     if( window->SkipItems ) return;
@@ -1646,22 +1646,37 @@ void View::DrawFrames()
     const auto w = wspace.x;
     auto draw = ImGui::GetWindowDrawList();
 
+    const auto Height = m_vd.viewPixelHeight * scale;
+    int maxHeight = 1000 * 1000 * 1000 / m_vd.maxFps;
+
     ImGui::InvisibleButton( "##frames", ImVec2( w, Height ) );
     bool hover = ImGui::IsItemHovered();
 
     draw->AddRectFilled( wpos, wpos + ImVec2( w, Height ), 0x33FFFFFF );
     const auto wheel = io.MouseWheel;
     const auto prevScale = m_vd.frameScale;
+    const bool ctrlClicked = io.KeyCtrl;
     if( hover )
     {
-        if( wheel > 0 )
-        {
-            if( m_vd.frameScale >= 0 ) m_vd.frameScale--;
-        }
-        else if( wheel < 0 )
-        {
-            if( m_vd.frameScale < 10 ) m_vd.frameScale++;
-        }
+        //if (ctrlClicked) {
+            if (wheel > 0)
+            {
+                if (maxHeight >= 100 * 1000 * 1000) maxHeight -= 50 * 1000 * 1000;
+            }
+            else if (wheel < 0)
+            {
+                if (maxHeight >= 1000 * 1000 * 1000) maxHeight += 50 * 1000 * 1000;
+            }
+        //} else {
+        //    if (wheel > 0)
+        //    {
+        //        if (m_vd.frameScale >= 0) m_vd.frameScale--;
+        //    }
+        //    else if (wheel < 0)
+        //    {
+        //        if (m_vd.frameScale < 10) m_vd.frameScale++;
+        //    }
+        //}
     }
 
     const int fwidth = GetFrameWidth( m_vd.frameScale );
@@ -1942,7 +1957,7 @@ void View::DrawFrames()
             }
 
             zoneTime /= group;
-            const auto h = std::max( 1.f, float( std::min<uint64_t>( MaxFrameTime, f ) ) / MaxFrameTime * ( Height - 2 ) );
+            const auto h = std::max( 1.f, float( std::min<uint64_t>(maxHeight, f ) ) / maxHeight * ( Height - 2 ) );
             if( zoneTime == 0 )
             {
                 if( fwidth != 1 )
@@ -1956,7 +1971,7 @@ void View::DrawFrames()
             }
             else if( zoneTime <= f )
             {
-                const auto zh = float( std::min<uint64_t>( MaxFrameTime, zoneTime ) ) / MaxFrameTime * ( Height - 2 );
+                const auto zh = float( std::min<uint64_t>(maxHeight, zoneTime ) ) / maxHeight * ( Height - 2 );
                 if( fwidth != 1 )
                 {
                     draw->AddRectFilled( wpos + ImVec2( 1 + i*fwidth, Height-1-h ), wpos + ImVec2( fwidth + i*fwidth, Height-1-zh ), 0xFF888888 );
@@ -1970,7 +1985,7 @@ void View::DrawFrames()
             }
             else
             {
-                const auto zh = float( std::min<uint64_t>( MaxFrameTime, zoneTime ) ) / MaxFrameTime * ( Height - 2 );
+                const auto zh = float( std::min<uint64_t>(maxHeight, zoneTime ) ) / maxHeight * ( Height - 2 );
                 if( fwidth != 1 )
                 {
                     draw->AddRectFilled( wpos + ImVec2( 1 + i*fwidth, Height-1-zh ), wpos + ImVec2( fwidth + i*fwidth, Height-1-h ), 0xFF2222BB );
@@ -2002,14 +2017,14 @@ void View::DrawFrames()
                 }
             }
 
-            const auto h = std::max( 1.f, float( std::min<uint64_t>( MaxFrameTime, f ) ) / MaxFrameTime * ( Height - 2 ) );
+            const auto h = std::max( 1.f, float( std::min<uint64_t>(maxHeight, f ) ) / maxHeight * ( Height - 2 ) );
             if( fwidth != 1 )
             {
-                draw->AddRectFilled( wpos + ImVec2( 1 + i*fwidth, Height-1-h ), wpos + ImVec2( fwidth + i*fwidth, Height-1 ), GetFrameColor( f ) );
+                draw->AddRectFilled( wpos + ImVec2( 1 + i*fwidth, Height-1-h ), wpos + ImVec2( fwidth + i*fwidth, Height-1 ), GetFrameColor( m_vd.goodFps, f ) );
             }
             else
             {
-                DrawLine( draw, dpos + ImVec2( 1+i, Height-2-h ), dpos + ImVec2( 1+i, Height-2 ), GetFrameColor( f ) );
+                DrawLine( draw, dpos + ImVec2( 1+i, Height-2-h ), dpos + ImVec2( 1+i, Height-2 ), GetFrameColor( m_vd.goodFps, f ) );
             }
 
             i++;
@@ -2036,9 +2051,13 @@ void View::DrawFrames()
         }
     }
 
-    DrawLine( draw, dpos + ImVec2( 0, round( Height - Height * BadTime / MaxFrameTime ) ),  dpos + ImVec2( w, round( Height - Height * BadTime / MaxFrameTime ) ),  0x4422DDDD );
-    DrawLine( draw, dpos + ImVec2( 0, round( Height - Height * GoodTime / MaxFrameTime ) ), dpos + ImVec2( w, round( Height - Height * GoodTime / MaxFrameTime ) ), 0x4422DD22 );
-    DrawLine( draw, dpos + ImVec2( 0, round( Height - Height * BestTime / MaxFrameTime ) ), dpos + ImVec2( w, round( Height - Height * BestTime / MaxFrameTime ) ), 0x44DD9900 );
+    int badTime = 1000 * 1000 * 1000 * 4 / m_vd.goodFps;
+    int goodTime = 1000 * 1000 * 1000 * 2 / m_vd.goodFps;
+    int bestTime = 1000 * 1000 * 1000 / m_vd.goodFps;
+
+    DrawLine( draw, dpos + ImVec2( 0, round( Height - Height * badTime / maxHeight) ),  dpos + ImVec2( w, round( Height - Height * badTime / maxHeight) ),  0x4422DDDD );
+    DrawLine( draw, dpos + ImVec2( 0, round( Height - Height * goodTime / maxHeight) ), dpos + ImVec2( w, round( Height - Height * goodTime / maxHeight) ), 0x4422DD22 );
+    DrawLine( draw, dpos + ImVec2( 0, round( Height - Height * bestTime / maxHeight) ), dpos + ImVec2( w, round( Height - Height * bestTime / maxHeight) ), 0x44DD9900 );
 }
 
 void View::HandleRange( Range& range, int64_t timespan, const ImVec2& wpos, float w )
@@ -8447,6 +8466,32 @@ void View::DrawOptions()
         if( tmp < 1 ) tmp = 1;
         m_vd.frameTarget = tmp;
     }
+
+    //tmp = m_vd.goodFps;
+    //ImGui::SetNextItemWidth(120);
+    //if (ImGui::InputInt("Good Fps", &tmp))
+    //{
+    //    if (tmp < 1) tmp = 1;
+    //    m_vd.goodFps = tmp;
+    //}
+    m_vd.goodFps = m_vd.frameTarget;
+
+    tmp = m_vd.maxFps;
+    ImGui::SetNextItemWidth(120);
+    if (ImGui::InputInt("View Max FPS", &tmp))
+    {
+        if (tmp < 1) tmp = 1;
+        m_vd.maxFps = tmp;
+    }
+
+    tmp = m_vd.viewPixelHeight;
+    ImGui::SetNextItemWidth(120);
+    if (ImGui::InputInt("View Height (pixel)", &tmp))
+    {
+        if (tmp < 1) tmp = 1;
+        m_vd.viewPixelHeight = tmp;
+    }
+
     ImGui::Unindent();
     if( m_worker.HasContextSwitches() )
     {
