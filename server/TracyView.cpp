@@ -1,3 +1,4 @@
+#include <cstdint>
 #ifdef _MSC_VER
 #  pragma warning( disable: 4267 )  // conversion from don't care to whatever, possible loss of data
 #endif
@@ -1601,13 +1602,13 @@ bool View::DrawConnection()
 
 static ImU32 GetFrameColor(uint64_t goodFps, uint64_t frameTime )
 {
-    if (frameTime > 1000 * 1000 * 1000 * 4 / goodFps) {
+    if (frameTime > 1000l * 1000l * 1000l * 4l / goodFps) {
         return 0xFF2222DD;
     }
-    if (frameTime > 1000 * 1000 * 1000 * 2 / goodFps) {
+    if (frameTime > 1000l * 1000l * 1000l * 2l / goodFps) {
         return 0xFF22DDDD;
     }
-    if (frameTime > 1000 * 1000 * 1000 * 1 / goodFps) {
+    if (frameTime > 1000l * 1000l * 1000l * 1l / goodFps) {
         return 0xFF22DD22;
     }
     return 0xFFDD9900;
@@ -1678,7 +1679,7 @@ void View::DrawFrames()
         }
     }
 
-    int maxHeight = 1000 * 1000 * 1000 / m_vd.maxFps;
+    int maxHeight = 1000l * 1000l * 1000l / m_vd.maxFps;
 
     const int fwidth = GetFrameWidth( m_vd.frameScale );
     const int group = GetFrameGroup( m_vd.frameScale );
@@ -2058,9 +2059,9 @@ void View::DrawFrames()
         }
     }
 
-    int badTime = 1000 * 1000 * 1000 * 4 / m_vd.goodFps;
-    int goodTime = 1000 * 1000 * 1000 * 2 / m_vd.goodFps;
-    int bestTime = 1000 * 1000 * 1000 / m_vd.goodFps;
+    int64_t badTime = 1000l * 1000l * 1000l* 4l / m_vd.goodFps;
+    int64_t goodTime = 1000l * 1000l * 1000l * 2l / m_vd.goodFps;
+    int64_t bestTime = 1000l * 1000l * 1000l / m_vd.goodFps;
 
     DrawLine( draw, dpos + ImVec2( 0, round( Height - Height * badTime / maxHeight) ),  dpos + ImVec2( w, round( Height - Height * badTime / maxHeight) ),  0x4422DDDD );
     DrawLine( draw, dpos + ImVec2( 0, round( Height - Height * goodTime / maxHeight) ), dpos + ImVec2( w, round( Height - Height * goodTime / maxHeight) ), 0x4422DD22 );
