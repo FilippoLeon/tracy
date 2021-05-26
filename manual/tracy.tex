@@ -1121,7 +1121,7 @@ enum SubSystems
 ...
 
 // Preferably a define in the build system
-#define SUBSYSTEMS Sys_Physics | Sys_NasalDemons
+#define SUBSYSTEMS (Sys_Physics | Sys_NasalDemons)
 
 ...
 
@@ -1530,6 +1530,10 @@ void DbgHelpLock() { WaitForSingleObject(dbgHelpLock, INFINITE); }
 void DbgHelpUnlock() { ReleaseMutex(dbgHelpLock); }
 }
 \end{lstlisting}
+
+\paragraph{Disabling resolution of inline frames}
+
+Inline frames retrieval on Windows can be multiple orders of magnitude slower than just performing basic symbol resolution. This is being manifested as profiler seemingly being stuck for a long time, having hundred thousands of query backlog entries queued, which are slowly trickling down. If your use case requires speed of operation rather than having call stacks with inline frames included, you may define the \texttt{TRACY\_NO\_CALLSTACK\_INLINES} macro, which will make the profiler stick to the basic but fast frame resolution mode.
 
 \subsection{Lua support}
 
